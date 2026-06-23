@@ -1,4 +1,4 @@
-name = "static-assets"
+name = "cloudflare-static-assets"
 main = "src/index.js"
 compatibility_date = "2026-06-01"
 
