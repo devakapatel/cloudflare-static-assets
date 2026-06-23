@@ -1,0 +1,74 @@
+name: Generate 1GB Pages Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate 11 × 100MB files
+        run: |
+          mkdir -p public
+          for i in $(seq 1 11); do
+            echo "Generating 100mb-${i}.bin..."
+            dd if=/dev/urandom of=public/100mb-${i}.bin bs=1M count=100 status=progress
+          done
+
+      - name: Generate index.html
+        run: |
+          {
+          echo '<!DOCTYPE html>'
+          echo '<html lang="en">'
+          echo '<head>'
+          echo '  <meta charset="UTF-8">'
+          echo '  <meta name="viewport" content="width=device-width, initial-scale=1.0">'
+          echo '  <title>1GB Pages Test</title>'
+          echo '  <style>'
+          echo '    * { margin: 0; padding: 0; box-sizing: border-box; }'
+          echo '    body { font-family: system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; display: flex; justify-content: center; align-items: center; }'
+          echo '    .container { max-width: 600px; width: 100%; padding: 2rem; }'
+          echo '    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }'
+          echo '    p { color: #888; margin-bottom: 2rem; }'
+          echo '    a { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; margin-bottom: 0.5rem; background: #161616; border: 1px solid #222; border-radius: 8px; color: #e0e0e0; text-decoration: none; transition: background 0.15s, border-color 0.15s; }'
+          echo '    a:hover { background: #1a1a1a; border-color: #444; }'
+          echo '    .name { font-weight: 500; }'
+          echo '    .size { color: #888; font-size: 0.875rem; }'
+          echo '  </style>'
+          echo '</head>'
+          echo '<body>'
+          echo '  <div class="container">'
+          echo '    <h1>1GB Pages Test</h1>'
+          echo '    <p>11 × 100MB binary files hosted via GitHub Pages.</p>'
+          for i in $(seq 1 11); do
+            echo "    <a href=\"100mb-${i}.bin\"><span class=\"name\">100mb-${i}.bin</span><span class=\"size\">100 MB</span></a>"
+          done
+          echo '  </div>'
+          echo '</body>'
+          echo '</html>'
+          } > public/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
