@@ -1,0 +1,98 @@
+name: Compare raw.githubusercontent.com vs CF
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/compare-raw-vs-cf.yml'
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare raw GitHub vs Cloudflare (full + range, 1.bin + 100.bin)
+        run: |
+          RAW="https://raw.githubusercontent.com/devakapatel/cloudflare-static-assets/refs/heads/main"
+          CF="http://github.datalord.dpdns.org"
+
+          echo "### raw.githubusercontent.com vs github.datalord.dpdns.org" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          test_url() {
+            local label="$1"
+            local url="$2"
+            local range_header="$3"
+            local runs=10
+
+            echo "#### $label" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            ttfb_total=0
+            time_total=0
+            ttfb_min=999
+            time_min=999
+            ok=true
+
+            for i in $(seq 1 $runs); do
+              if [ -n "$range_header" ]; then
+                result=$(curl -s -o /dev/null -w "%{time_starttransfer} %{time_total} %{http_code}" -H "$range_header" "$url")
+              else
+                result=$(curl -s -o /dev/null -w "%{time_starttransfer} %{time_total} %{http_code}" "$url")
+              fi
+
+              ttfb=$(echo $result | awk '{print $1}')
+              total=$(echo $result | awk '{print $2}')
+              http=$(echo $result | awk '{print $3}')
+
+              ttfb_ms=$(echo "$ttfb * 1000" | bc)
+              total_ms=$(echo "$total * 1000" | bc)
+
+              ttfb_total=$(echo "$ttfb_total + $ttfb_ms" | bc)
+              time_total=$(echo "$time_total + $total_ms" | bc)
+
+              if (( $(echo "$ttfb_ms < $ttfb_min" | bc -l) )); then ttfb_min=$ttfb_ms; fi
+              if (( $(echo "$total_ms < $time_min" | bc -l) )); then time_min=$total_ms; fi
+
+              if [ "$http" != "200" ] && [ "$http" != "206" ]; then
+                ok=false
+                echo "Run $i: HTTP $http (FAIL)" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+
+            ttfb_avg=$(echo "scale=1; $ttfb_total / $runs" | bc)
+            time_avg=$(echo "scale=1; $time_total / $runs" | bc)
+            ttfb_min=$(printf "%.1f" $ttfb_min)
+            time_min=$(printf "%.1f" $time_min)
+
+            if $ok; then
+              echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| TTFB avg | ${ttfb_avg}ms |" >> $GITHUB_STEP_SUMMARY
+              echo "| TTFB best | ${ttfb_min}ms |" >> $GITHUB_STEP_SUMMARY
+              echo "| Total avg | ${time_avg}ms |" >> $GITHUB_STEP_SUMMARY
+              echo "| Total best | ${time_min}ms |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| **FAILED** | HTTP errors detected |" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          }
+
+          # 1.bin full
+          test_url "1.bin — raw.githubusercontent.com (full)" "$RAW/1.bin"
+          test_url "1.bin — github.datalord.dpdns.org (full)" "$CF/1.bin"
+
+          # 1.bin range
+          test_url "1.bin — raw.githubusercontent.com (range 0-1023)" "$RAW/1.bin" "Range: bytes=0-1023"
+          test_url "1.bin — github.datalord.dpdns.org (range 0-1023)" "$CF/1.bin" "Range: bytes=0-1023"
+
+          # 100.bin full
+          test_url "100.bin — raw.githubusercontent.com (full)" "$RAW/100.bin"
+          test_url "100.bin — github.datalord.dpdns.org (full)" "$CF/100.bin"
+
+          # 100.bin range
+          test_url "100.bin — raw.githubusercontent.com (range 0-1023)" "$RAW/100.bin" "Range: bytes=0-1023"
+          test_url "100.bin — github.datalord.dpdns.org (range 0-1023)" "$CF/100.bin" "Range: bytes=0-1023"
+
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Tests run from GitHub Actions (US region). 10 runs per test.*" >> $GITHUB_STEP_SUMMARY
