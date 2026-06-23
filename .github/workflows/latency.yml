@@ -1,0 +1,54 @@
+name: Latency Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+env:
+  BASE_URL: https://github.datalord.dpdns.org
+
+jobs:
+  latency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Full request - 1.bin (1MB)
+        run: |
+          echo "### Full request — 1.bin (1MB)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          for i in $(seq 1 10); do
+            curl -s -o /dev/null -w "Run $i: TTFB=%{time_starttransfer}s Total=%{time_total}s Size=%{size_download}\n" "$BASE_URL/1.bin"
+          done | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Range request - 1.bin (bytes 0-1023)
+        run: |
+          echo "### Range request — 1.bin (bytes 0-1023)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          for i in $(seq 1 10); do
+            curl -s -o /dev/null -w "Run $i: TTFB=%{time_starttransfer}s Total=%{time_total}s HTTP=%{http_code}\n" -H "Range: bytes=0-1023" "$BASE_URL/1.bin"
+          done | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Range request - 100.bin (bytes 0-1023)
+        run: |
+          echo "### Range request — 100.bin (bytes 0-1023)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          for i in $(seq 1 10); do
+            curl -s -o /dev/null -w "Run $i: TTFB=%{time_starttransfer}s Total=%{time_total}s HTTP=%{http_code}\n" -H "Range: bytes=0-1023" "$BASE_URL/100.bin"
+          done | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Cache status check
+        run: |
+          echo "### Cache status" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "--- 1.bin ---"
+          curl -s -D- -o /dev/null "$BASE_URL/1.bin" | grep -iE "^(cf-cache|age|cache-control)"
+          echo ""
+          echo "--- 100.bin (range) ---"
+          curl -s -D- -o /dev/null -H "Range: bytes=0-1023" "$BASE_URL/100.bin" | grep -iE "^(cf-cache|age|cache-control|content-range)"
+          echo ""
+          echo "--- index.html ---"
+          curl -s -D- -o /dev/null "$BASE_URL/" | grep -iE "^(cf-cache|age|cache-control)"
+          echo '```' >> $GITHUB_STEP_SUMMARY
