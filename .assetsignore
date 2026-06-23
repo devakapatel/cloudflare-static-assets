@@ -1,6 +1,0 @@
-.git
-.gitignore
-src
-wrangler.toml
-package.json
-.assetsignore
