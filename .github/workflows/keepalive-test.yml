@@ -1,0 +1,54 @@
+name: Keep-Alive Test
+
+on:
+  workflow_dispatch:
+
+env:
+  BASE_URL: https://github.datalord.dpdns.org
+  HEY_IMAGE: docker.io/williamyeh/hey:latest
+
+jobs:
+  keepalive-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Full request — 1.bin with keep-alive
+        run: |
+          echo "### Full request — 1.bin (1MB) WITH keep-alive" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          podman run --rm ${{ env.HEY_IMAGE }} -n 20 -c 1 -h2 "${{ env.BASE_URL }}/1.bin" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Full request — 1.bin WITHOUT keep-alive
+        run: |
+          echo "### Full request — 1.bin (1MB) WITHOUT keep-alive" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          podman run --rm ${{ env.HEY_IMAGE }} -n 20 -c 1 -h2 -disable-keepalive "${{ env.BASE_URL }}/1.bin" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Range request — 1.bin with keep-alive
+        run: |
+          echo "### Range request — 1.bin (bytes 0-1023) WITH keep-alive" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          podman run --rm ${{ env.HEY_IMAGE }} -n 20 -c 1 -h2 -H "Range: bytes=0-1023" "${{ env.BASE_URL }}/1.bin" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Range request — 1.bin WITHOUT keep-alive
+        run: |
+          echo "### Range request — 1.bin (bytes 0-1023) WITHOUT keep-alive" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          podman run --rm ${{ env.HEY_IMAGE }} -n 20 -c 1 -h2 -disable-keepalive -H "Range: bytes=0-1023" "${{ env.BASE_URL }}/1.bin" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Range request — 25.bin with keep-alive
+        run: |
+          echo "### Range request — 25.bin (bytes 0-1023) WITH keep-alive" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          podman run --rm ${{ env.HEY_IMAGE }} -n 20 -c 1 -h2 -H "Range: bytes=0-1023" "${{ env.BASE_URL }}/25.bin" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Range request — 25.bin WITHOUT keep-alive
+        run: |
+          echo "### Range request — 25.bin (bytes 0-1023) WITHOUT keep-alive" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          podman run --rm ${{ env.HEY_IMAGE }} -n 20 -c 1 -h2 -disable-keepalive -H "Range: bytes=0-1023" "${{ env.BASE_URL }}/25.bin" 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
